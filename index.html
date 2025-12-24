@@ -230,7 +230,7 @@
 
     <!-- --- Page 1: Home/Extractor --- -->
     <div id="home-page" class="page">
-        <h1>IvyHelper 單字小幫手</h1>
+        <h1>Ivy-vocab 單字解析器</h1>
         <div id="controls">
             <label for="url-input">請在此貼上、掃描或從文章列表選取：</label>
             <div class="input-wrapper">
@@ -551,29 +551,36 @@
             }
         }
 
-        function getMonthNumber(monthName) {
-            const months = { 'JAN': '1', 'FEB': '2', 'MAR': '3', 'APR': '4', 'MAY': '5', 'JUN': '6', 'JUL': '7', 'AUG': '8', 'SEP': '9', 'OCT': '10', 'NOV': '11', 'DEC': '12' };
-            return months[monthName.toUpperCase()] || '';
-        }
+        // 輔助函式：取得月份數字 (供 render 使用)
+        const monthMap = { 'JAN': '1', 'FEB': '2', 'MAR': '3', 'APR': '4', 'MAY': '5', 'JUN': '6', 'JUL': '7', 'AUG': '8', 'SEP': '9', 'OCT': '10', 'NOV': '11', 'DEC': '12' };
+        
+        // 輔助函式：取得星期中文
+        const weekMap = { 'MON': '星期一', 'TUE': '星期二', 'WED': '星期三', 'THU': '星期四', 'FRI': '星期五', 'SAT': '星期六', 'SUN': '星期日' };
 
         /**
          * 根據結構化的 JSON 資料來渲染文章列表
+         * JSON 格式範例: "JAN.01" 與 "THU"
          */
         function renderArticlesFromJSON(groupedData, container) {
             container.innerHTML = '';
             
+            // 排序主鍵 (如 "2026-JAN")
+            // 邏輯: 拆分年與月，轉成 Date 物件比較
             const sortedMonthKeys = Object.keys(groupedData).sort((a, b) => {
-                const dateA = new Date(a.replace("-", " 01, "));
-                const dateB = new Date(b.replace("-", " 01, "));
-                return dateB - dateA;
+                const [yearA, monthA] = a.split('-');
+                const [yearB, monthB] = b.split('-');
+                // 日期物件需要完整格式，例如 "JAN 01, 2026"
+                return new Date(`${monthB} 01, ${yearB}`) - new Date(`${monthA} 01, ${yearA}`);
             });
 
             sortedMonthKeys.forEach(key => {
                 const monthData = groupedData[key];
                 
+                // 標題顯示
                 const headerElement = document.createElement('h2');
                 headerElement.className = 'month-header';
-                headerElement.textContent = `${monthData.year} 年 ${getMonthNumber(monthData.month)} 月`;
+                const mNum = monthMap[monthData.month.toUpperCase()] || monthData.month;
+                headerElement.textContent = `${monthData.year} 年 ${mNum} 月`;
                 headerElement.style.display = 'block';
                 container.appendChild(headerElement);
 
@@ -582,7 +589,29 @@
                     itemElement.className = 'article-item';
                     itemElement.dataset.url = article.url;
                     
-                    const dateDisplay = `${article.date.replace('.', '/')} (${article.day_of_week})`;
+                    let dateDisplay = article.date;
+                    
+                    try {
+                        // 解析格式: "JAN.01"
+                        const parts = article.date.split('.');
+                        if (parts.length >= 2) {
+                            const monStr = parts[0].toUpperCase();
+                            const dayStr = parts[1];
+                            
+                            // 轉換
+                            const m = monthMap[monStr] || monStr; 
+                            const d = parseInt(dayStr, 10); // 去除 0 開頭
+                            const w = weekMap[article.day_of_week.toUpperCase()] || article.day_of_week;
+                            
+                            // 組合: 1月1日 星期四
+                            dateDisplay = `${m}月${d}日 ${w}`;
+                        }
+                    } catch (e) {
+                        console.error('日期解析失敗', e);
+                        // 失敗時回退
+                        dateDisplay = `${article.date} (${article.day_of_week})`;
+                    }
+
                     itemElement.innerHTML = `<span class="date">${dateDisplay}</span><span class="title">${article.title}</span>`;
                     container.appendChild(itemElement);
                 });
